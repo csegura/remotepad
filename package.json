@@ -1,0 +1,30 @@
+{
+  "name": "remotepad",
+  "version": "1.0.0",
+  "description": "Remote overlay paint",
+  "main": "./server/server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "./remotepad.sh",
+    "debug": "nodemon --no-stdin  ./server/server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/csegura/remotepad.git"
+  },
+  "author": "Carlos Segura",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/csegura/remotepad/issues"
+  },
+  "homepage": "https://github.com/csegura/remotepad#readme",
+  "dependencies": {
+    "express": "^4.17.2",
+    "jimp": "^0.16.1",
+    "socket.io": "^4.4.1",
+    "x11": "^2.3.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.15"
+  }
+}

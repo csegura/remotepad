@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <title>RemotePad</title>
+    <meta name="description" content="Remote draw over the screen" />
+    <meta name="author" content="Carlos Segura (@romheat)" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="draw.css" />
+    <script
+      src="https://cdn.socket.io/4.4.1/socket.io.min.js"
+      integrity="sha384-fKnu0iswBIqkjxrhQCTZ7qlLHOFEgNkRmK2vaO/LbTZSXdJfAu6ewRBdwHPhBo/H"
+      crossorigin="anonymous"
+    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/drawall@1.0.0/drawall.min.js"></script>
+  </head>
+  <body>
+    <div class="menu disable-select">
+      <button id="btn-load" class="button" type="button">Load</button>
+      <button id="btn-clear" class="button" type="button">Clear</button>
+      <button id="btn-color-r" class="button" type="button">R</button>
+      <button id="btn-color-g" class="button" type="button">G</button>
+      <button id="btn-color-b" class="button" type="button">B</button>
+      <input type="color" id="btn-color" value="#f6b73c" />
+      <button id="btn-scroll" class="button scr" type="button">scroll</button>
+      <button id="btn-end" class="button end" type="button">END</button>
+      <button id="btn-undo" class="button undo" type="button">Undo</button>
+    </div>
+    <div id="container" class="container disable-select">
+      <canvas id="background" class="background"></canvas>
+      <canvas id="drawing" class="drawing"></canvas>
+      <span id="loader" class="loader"></span>
+    </div>
+    <script src="client.js" async defer></script>
+  </body>
+</html>
