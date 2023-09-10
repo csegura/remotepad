@@ -249,7 +249,12 @@ const XRemotePad = async (target, io) => {
     setTimeout(() => {
       activateOverlay()
       log('overlay activated')
-      if (rdraw) redraw()
+      if (rdraw) {
+        redraw()
+      } else {
+        drawHistory = []
+        points = []
+      }
     }, 50)
   }
 
