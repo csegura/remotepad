@@ -8,7 +8,7 @@ if [ -z "$1" ]; then
 else
     # check if $1 == "current"
     if [ "$1" = "current" ]; then
-        WID=$(xdotool getactivewindow)
+        WID=$(xprop -root 2>/dev/null | sed -n '/^_NET_ACTIVE_WINDOW/ s/.* // p')
     else
         WID=$1
     fi
