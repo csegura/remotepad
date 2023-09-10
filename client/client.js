@@ -15,13 +15,11 @@ let ratio = null
 // last loaded image (screen capture)
 let img
 
-let menuHeight = 22
-
 // log - if activated logs are send to server
-let log = false
+const log = false
 
 // fast colors
-let colors = [
+const colors = [
   {
     element: 'btn-color-r',
     color: '#de3700'
@@ -35,12 +33,6 @@ let colors = [
     color: '#54c2cc'
   }
 ]
-
-/**
- * Get the bounding rectangle of the canvas
- * (Used to calculate relative position of pointer event)
- */
-const boundingRect = canvas.getBoundingClientRect()
 
 /**
  * draw image on canvas
@@ -100,12 +92,14 @@ const loadScreen = () => {
   socket.emit('capture')
 }
 
-// End mapping
+/**
+ * Send end event to server
+ * Close connection
+ */
 const sendEnd = () => {
   drawAll.clear()
-  background.style.display = 'none'
-  loader.style.display = 'block'
-
+  showBackground(false)
+  showLoader(true)
   socket.emit('end')
   connected = false
 }
@@ -167,7 +161,7 @@ const adjustPosition = (pos) => {
  * lock/unlock scroll
  */
 const lockUnlockScroll = (e) => {
-  if (container.style.overflow == 'hidden') {
+  if (container.style.overflow === 'hidden') {
     container.style.overflow = 'scroll'
     e.target.style.background = '#e7be4d'
   } else {
@@ -182,10 +176,19 @@ const lockUnlockScroll = (e) => {
 const emitLog = (msg, obj) => {
   if (!log) return
   socket.emit('log', msg)
-  if (typeof obj == 'object') {
+  if (typeof obj === 'object') {
     socket.emit('log', JSON.stringify(obj))
   }
   console.log(msg, obj)
+}
+
+const showLoader = (show) => {
+  loader.style.display = show ? 'block' : 'none'
+  loader.style.background = connected ? '#000' : '#fff'
+}
+
+const showBackground = (show) => {
+  background.style.display = show ? 'block' : 'none'
 }
 
 const attachUIEvents = () => {
@@ -219,6 +222,7 @@ const attachUIEvents = () => {
 }
 
 const initDrawAll = () => {
+  const menuHeight = 22
   // set initial canvas size
   canvas.width = window.innerWidth
   canvas.height = window.innerHeight - menuHeight
@@ -246,6 +250,23 @@ const initDrawAll = () => {
 }
 
 const initComs = () => {
+  socket.on('connect', () => {
+    emitLog('Client Connected')
+    drawAll.clear()
+    showLoader(true)
+    //socket.emit('capture')
+    connected = true
+  })
+
+  socket.on('disconnect', (reason) => {
+    connected = false
+    showBackground(false)
+    showLoader(true)
+    if (reason === 'io server disconnect') {
+      socket.connect()
+    }
+  })
+
   /**
    * If there is an image available
    * draw it on canvas
@@ -253,7 +274,7 @@ const initComs = () => {
   socket.on('get_screen', async function (msg) {
     img = await loadImage('/screen.jpg?' + Date.now())
     // hide loader
-    loader.style.display = 'none'
+    showLoader(false)
     // check if image is too big
     fit = isNecesaryFit(canvas, img)
     emitLog('need fit: ', fit)
@@ -265,7 +286,7 @@ const initComs = () => {
     emitLog('ratio', ratio)
 
     emitLog('rcvd get_screen: ' + msg)
-    background.style.display = 'block'
+    showBackground(true)
     connected = true
     drawAll.clear()
   })
