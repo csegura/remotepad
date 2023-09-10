@@ -22,9 +22,9 @@ const XGetScreen = async (path, wid, fileName = 'screen') => {
     console.error('getScreen - x11 client error: ', err)
   })
 
-  X.on('end', function () {
-    console.log('getScreen client destroyed')
-  })
+  // X.on('end', function () {
+  //   console.log('getScreen client destroyed')
+  // })
 
   X.GetGeometry = promisify(X.GetGeometry, X)
   X.GetImage = promisify(X.GetImage, X)
@@ -67,7 +67,7 @@ const XGetScreen = async (path, wid, fileName = 'screen') => {
     }
 
     shoot.write = promisify(shoot.write, shoot)
-    await shoot.write(`${path}/${fileName}.jpg`)
+    shoot.write(`${path}/${fileName}.jpg`)
   } catch (err) {
     console.error('X Error', err)
   }
