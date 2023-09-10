@@ -4,8 +4,9 @@ const backgroundCtx = background.getContext('2d')
 const loader = document.getElementById('loader')
 const container = document.getElementById('container')
 
-let drawAll
-let socket
+const socket = io()
+const drawAll = new Drawall(canvas, { guides: false })
+
 let connected = false
 
 // by default we want the image fit on canvas
@@ -88,8 +89,7 @@ const undoDraw = (_) => {
  * and send it back with a get_screen event
  */
 const loadScreen = () => {
-  if (!socket.connected) socket = io()
-  socket.emit('capture')
+  if (connected) socket.emit('capture')
 }
 
 /**
@@ -293,8 +293,6 @@ const initComs = () => {
 }
 
 window.onload = () => {
-  socket = io()
-  drawAll = new Drawall(canvas, { guides: false })
   attachUIEvents()
   initDrawAll()
   initComs()
