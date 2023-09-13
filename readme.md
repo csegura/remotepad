@@ -95,7 +95,8 @@ Sample
 - [ ] Improve client interface
 - [ ] Smooth draw on X11
 - [x] Stream image
-- [ ] Config file
+- [x] Config file
+- [ ] Test on different wm (I'm using i3)
 
 #### Development
 

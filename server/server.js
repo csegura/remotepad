@@ -5,6 +5,7 @@ const server = http.createServer(app)
 const path = require('path')
 const { Server } = require('socket.io')
 const { XRemotePad } = require('./XRemotePad')
+const config = require('./config')
 
 const stdin = process.openStdin()
 stdin.setRawMode(true)
@@ -34,14 +35,15 @@ stdin.on('data', async function (key) {
   }
 })
 
-server.listen(3000, () => {
-  console.log(`listening on ${server.address()}:3000`)
-  console.log(' ESC/Space/Q - Exit')
-  console.log(' r/g/b - Change color (in drawing mode)')
-  console.log(' q - Quit server')
+server.listen(config.port, () => {
+  console.log(`Runnig on port ${config.port}`)
+  console.log('ESC/Space/q - Exit')
+
+  console.log(`CTRL+SHIFT control keys
+      +d to activate drawing mode
+      +r/g/b to change color
+      +e to disable drawing mode`)
   //
-  console.log('Running...')
-  console.log('CTRL+SHIFT+d to activate/deactivate overlay mode')
   ;(async () => {
     await XRemotePad(wid, io)
   })()
