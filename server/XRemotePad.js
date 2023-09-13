@@ -2,7 +2,11 @@ const x11 = require('x11')
 const { promisify } = require('util')
 const path = require('path')
 const XTools = require('./XTools')
-const { XGetScreen, XTakeScreenshot } = require('./XGetScreen')
+const {
+  XScreen2Jpg,
+  XTakeScreenshot,
+  XGetBufferedScreen
+} = require('./XGetScreen')
 
 const debug = false
 x11.createClient = promisify(x11.createClient, x11)
@@ -296,10 +300,11 @@ const XRemote = (io, pad) => {
 
     socket.on('capture', async () => {
       log('rcvd: capture')
-      let coords = await XGetScreen(path.resolve('./client'), pad.target)
-      log('Calculated coords:', coords)
-      socket.emit('get_screen', 'done')
-      log('Capture done')
+      const buf = await XGetBufferedScreen(pad.target)
+      socket.emit('screen', {
+        image: true,
+        buffer: buf.toString('base64')
+      })
       pad.activateOverlay()
     })
 

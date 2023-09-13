@@ -39,7 +39,6 @@ const colors = [
  * draw image on canvas
  */
 const drawImage = (ctx, image, fit) => {
-  console.log(image)
   if (fit) {
     ctx.drawImage(
       image,
@@ -117,6 +116,18 @@ const loadImage = (src) => {
 }
 
 /**
+ * load image from buffer
+ */
+const loadImageFromBuffer = (buf) => {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = reject
+    img.src = 'data:image/jpeg;base64,' + buf
+  })
+}
+
+/**
  * check if image fit on canvas
  */
 const isNecesaryFit = (canvas, image) => {
@@ -179,7 +190,6 @@ const emitLog = (msg, obj) => {
   if (typeof obj === 'object') {
     socket.emit('log', JSON.stringify(obj))
   }
-  console.log(msg, obj)
 }
 
 const showLoader = (show) => {
@@ -267,29 +277,45 @@ const initComs = () => {
     }
   })
 
-  /**
-   * If there is an image available
-   * draw it on canvas
-   */
-  socket.on('get_screen', async function (msg) {
-    img = await loadImage('/screen.jpg?' + Date.now())
-    // hide loader
-    showLoader(false)
-    // check if image is too big
-    fit = isNecesaryFit(canvas, img)
-    emitLog('need fit: ', fit)
+  socket.on('screen', async (data) => {
+    emitLog('rcvd screen')
+    let img = await loadImageFromBuffer(data.buffer)
+    emitLog('rcvd screen: ' + data.buffer.length)
+    let fit = isNecesaryFit(canvas, img)
     // resize canvas, fit if necessary
     resizeCanvas(canvas, img, container, fit)
     drawImage(backgroundCtx, img, fit)
-
     calcRatio(fit, img, canvas)
     emitLog('ratio', ratio)
-
-    emitLog('rcvd get_screen: ' + msg)
     showBackground(true)
+    showLoader(false)
     connected = true
     drawAll.clear()
   })
+
+  // /**
+  //  * If there is an image available
+  //  * draw it on canvas
+  //  */
+  // socket.on('get_screen', async function (msg) {
+  //   img = await loadImage('/screen.jpg?' + Date.now())
+  //   // hide loader
+  //   showLoader(false)
+  //   // check if image is too big
+  //   fit = isNecesaryFit(canvas, img)
+  //   emitLog('need fit: ', fit)
+  //   // resize canvas, fit if necessary
+  //   resizeCanvas(canvas, img, container, fit)
+  //   drawImage(backgroundCtx, img, fit)
+
+  //   calcRatio(fit, img, canvas)
+  //   emitLog('ratio', ratio)
+
+  //   emitLog('rcvd get_screen: ' + msg)
+  //   showBackground(true)
+  //   connected = true
+  //   drawAll.clear()
+  // })
 }
 
 window.onload = () => {
