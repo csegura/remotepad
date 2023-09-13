@@ -64,6 +64,10 @@ Application runs a server (localhost:3000) ....
 
 ....
 
+#### Motivation
+
+Learn X11, use my tablet, have fun
+
 ### Tips
 
 #### Use in Visual Studio Code
@@ -90,6 +94,8 @@ Sample
 
 - [ ] Improve client interface
 - [ ] Smooth draw on X11
+- [x] Stream image
+- [ ] Config file
 
 #### Development
 
