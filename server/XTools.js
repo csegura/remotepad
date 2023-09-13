@@ -82,11 +82,11 @@ const XQuadraticCurveTo = (X, display, wid, gc, points) => {
   // Number of line segments for approximation
   const segments = 15
   const l = points.length - 1
-  // Get the current point
-  // log('points: ', points[l], points[l - 1])
   let { x: currentX, y: currentY } = points[l]
   const { x: xc, y: yc } = points[l - 1]
-  const { x: cpx, y: cpy } = points[l - 1]
+  // Calculate control point
+  const cpx = (currentX + xc) / 2
+  const cpy = (currentY + yc) / 2
 
   // Calculate points along the curve using interpolation
   for (let i = 0; i <= segments; i++) {
@@ -96,8 +96,7 @@ const XQuadraticCurveTo = (X, display, wid, gc, points) => {
     const pointY = u * u * currentY + 2 * u * t * cpy + t * t * yc
 
     // Draw a line segment between the current point and the calculated point
-    if (i > 0)
-      X.PolyLine(display, wid, gc, [currentX, currentY, pointX, pointY])
+    X.PolyLine(display, wid, gc, [currentX, currentY, pointX, pointY])
 
     // Update the current point
     currentX = pointX
