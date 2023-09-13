@@ -104,18 +104,6 @@ const sendEnd = () => {
 }
 
 /**
- * load image from url
- */
-const loadImage = (src) => {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => resolve(img)
-    img.onerror = reject
-    img.src = src
-  })
-}
-
-/**
  * load image from buffer
  */
 const loadImageFromBuffer = (buf) => {
@@ -264,7 +252,6 @@ const initComs = () => {
     emitLog('Client Connected')
     drawAll.clear()
     showLoader(true)
-    //socket.emit('capture')
     connected = true
   })
 
@@ -292,30 +279,6 @@ const initComs = () => {
     connected = true
     drawAll.clear()
   })
-
-  // /**
-  //  * If there is an image available
-  //  * draw it on canvas
-  //  */
-  // socket.on('get_screen', async function (msg) {
-  //   img = await loadImage('/screen.jpg?' + Date.now())
-  //   // hide loader
-  //   showLoader(false)
-  //   // check if image is too big
-  //   fit = isNecesaryFit(canvas, img)
-  //   emitLog('need fit: ', fit)
-  //   // resize canvas, fit if necessary
-  //   resizeCanvas(canvas, img, container, fit)
-  //   drawImage(backgroundCtx, img, fit)
-
-  //   calcRatio(fit, img, canvas)
-  //   emitLog('ratio', ratio)
-
-  //   emitLog('rcvd get_screen: ' + msg)
-  //   showBackground(true)
-  //   connected = true
-  //   drawAll.clear()
-  // })
 }
 
 window.onload = () => {
