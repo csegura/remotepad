@@ -1,3 +1,13 @@
-node_modules
-package-lock.json
+.env
+*.
+build/
+deps/
+release/
 screenshots/*.jpg
+screenshots/*.png
+!screenshots/.gitkeep
+*.o
+*/*.md
+!readme.md
+!.gitignore
+*.log

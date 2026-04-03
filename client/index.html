@@ -8,29 +8,73 @@
     <meta name="author" content="Carlos Segura (@romheat)" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link rel="stylesheet" href="draw.css" />
-    <script
-      src="https://cdn.socket.io/4.4.1/socket.io.min.js"
-      integrity="sha384-fKnu0iswBIqkjxrhQCTZ7qlLHOFEgNkRmK2vaO/LbTZSXdJfAu6ewRBdwHPhBo/H"
-      crossorigin="anonymous"
-    ></script>
-    <script src="https://cdn.jsdelivr.net/npm/drawall@2.0.0/drawall.min.js"></script>
   </head>
   <body>
-    <div class="menu disable-select">
-      <button id="btn-load" class="button" type="button">Load</button>
-      <button id="btn-clear" class="button" type="button">Clear</button>
-      <button id="btn-color-r" class="button" type="button">R</button>
-      <button id="btn-color-g" class="button" type="button">G</button>
-      <button id="btn-color-b" class="button" type="button">B</button>
-      <input type="color" id="btn-color" value="#f6b73c" />
-      <button id="btn-scroll" class="button scr" type="button">scroll</button>
-      <button id="btn-end" class="button end" type="button">END</button>
-      <button id="btn-undo" class="button undo" type="button">Undo</button>
-    </div>
-    <div id="container" class="container disable-select">
-      <canvas id="background" class="background"></canvas>
-      <canvas id="drawing" class="drawing"></canvas>
-      <span id="loader" class="loader"></span>
+    <div class="shell">
+      <header class="toolbar">
+        <div class="toolbar-row">
+          <div class="toolbar-group">
+            <button id="btn-load" class="btn" type="button" title="Refresh screen">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M13 3a6.5 6.5 0 1 0 .7 7"/><path d="M13 1v3.5H9.5"/>
+              </svg>
+            </button>
+          </div>
+          <div class="toolbar-group">
+            <button id="btn-color-r" class="btn color-chip red" type="button"></button>
+            <button id="btn-color-g" class="btn color-chip green is-active" type="button"></button>
+            <button id="btn-color-b" class="btn color-chip blue" type="button"></button>
+            <input type="color" id="btn-color" value="#adff2f" />
+          </div>
+          <div class="toolbar-group">
+            <button id="preset-fine" class="btn preset is-active" type="button">F</button>
+            <button id="preset-medium" class="btn preset" type="button">M</button>
+            <button id="preset-bold" class="btn preset" type="button">B</button>
+          </div>
+          <div class="toolbar-group">
+            <button id="btn-undo" class="btn" type="button" title="Undo">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h7a3 3 0 0 1 0 6H8"/><path d="M6 3L3 6l3 3"/>
+              </svg>
+            </button>
+            <button id="btn-clear" class="btn" type="button" title="Clear all">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 4l8 8M12 4l-8 8"/>
+              </svg>
+            </button>
+          </div>
+          <div class="toolbar-group">
+            <button id="btn-screenshot" class="btn" type="button" title="Save screenshot">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="1" y="3" width="14" height="10" rx="1.5"/><circle cx="8" cy="8.5" r="2.5"/><path d="M5.5 3L6.5 1.5h3L10.5 3"/>
+              </svg>
+            </button>
+          </div>
+          <span id="status-chip" class="chip connecting">...</span>
+          <div class="toolbar-end">
+            <button id="btn-fullscreen" class="btn" type="button" title="Toggle fullscreen">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/>
+              </svg>
+            </button>
+            <button id="btn-end" class="btn btn-end" type="button" title="End session">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="10" height="10" rx="1"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </header>
+      <div id="container" class="container disable-select">
+        <canvas id="background" class="background"></canvas>
+        <canvas id="drawing" class="drawing"></canvas>
+        <span id="loader" class="loader"></span>
+        <div id="splash-info" class="splash-info">
+          <div class="splash-title">RemotePad</div>
+          <div class="splash-version">v1.0.0</div>
+          <a class="splash-link" href="https://github.com/csegura/remotepad" target="_blank">github.com/csegura/remotepad</a>
+        </div>
+      </div>
     </div>
     <script src="client.js" async defer></script>
   </body>

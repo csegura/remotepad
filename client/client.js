@@ -1,288 +1,624 @@
 const canvas = document.getElementById('drawing')
 const background = document.getElementById('background')
-const backgroundCtx = background.getContext('2d')
-const loader = document.getElementById('loader')
+const bgCtx = background.getContext('2d')
+const drawCtx = canvas.getContext('2d')
 const container = document.getElementById('container')
+const loader = document.getElementById('loader')
+const statusChip = document.getElementById('status-chip')
+const colorPicker = document.getElementById('btn-color')
+const splashInfo = document.getElementById('splash-info')
 
-const socket = io()
-const drawAll = new Drawall(canvas, { guides: false })
-
+let ws = null
 let connected = false
+let capturing = false
+let drawingEnabled = false
+let currentColor = '#adff2f'
+let brushSize = 2
+let sourceImage = null
+let captureMeta = null
+let pendingCaptureMeta = null
+let resizeCaptureTimer = null
+let lastClearTapAt = 0
+let firstStrokeFeedbackPending = false
+let statusResetTimer = null
+let captureRequestedAtMs = 0
+let lastAppliedCaptureSeq = 0
+let reconnectDelay = 500
+const RECONNECT_MIN = 500
+const RECONNECT_MAX = 5000
 
-// by default we want the image fit on canvas
-let fit = true
-// image ratio - calculated on load
-let ratio = null
-// last loaded image (screen capture)
-let img
+const viewport = {
+  offsetX: 0,
+  offsetY: 0,
+  width: 0,
+  height: 0,
+  scale: 1
+}
 
-// log - if activated logs are send to server
-const log = false
+let drawing = false
+let currentStrokeSource = []
+const strokesSource = []
 
-// fast colors
+const presetMap = {
+  fine: 2,
+  medium: 4,
+  bold: 8
+}
+
 const colors = [
-  {
-    element: 'btn-color-r',
-    color: '#de3700'
-  },
-  {
-    element: 'btn-color-g',
-    color: '#adff2f'
-  },
-  {
-    element: 'btn-color-b',
-    color: '#54c2cc'
-  }
+  { element: 'btn-color-r', color: '#de3700' },
+  { element: 'btn-color-g', color: '#adff2f' },
+  { element: 'btn-color-b', color: '#54c2cc' }
 ]
 
-/**
- * draw image on canvas
- */
-const drawImage = (ctx, image, fit) => {
-  if (fit) {
-    ctx.drawImage(
-      image,
-      // source rectangle
-      0,
-      0,
-      image.width,
-      image.height,
-      // destination rectangle
-      0,
-      0,
-      ctx.canvas.width,
-      ctx.canvas.height
-    )
-  } else {
-    ctx.drawImage(image, 0, 0)
+const setStatus = (message, state = 'connecting') => {
+  statusChip.textContent = message
+  statusChip.title = message
+  statusChip.classList.remove('ready', 'connecting', 'capturing', 'error', 'confirm')
+  statusChip.classList.add(state)
+}
+
+const flashStatus = (message, state = 'error', ms = 1000) => {
+  if (statusResetTimer) {
+    clearTimeout(statusResetTimer)
   }
-}
-
-/**
- * resize canvas to fit image
- * if fit is true, the canvas will be resized to fit the image
- */
-const resizeCanvas = (canvas, image, container, fit) => {
-  canvas.width = fit ? container.clientWidth : image.width
-  canvas.height = fit ? container.clientHeight : image.height
-}
-
-/**
- * Clear canvas
- * Maintain last image
- */
-const clearCanvas = (ev) => {
-  ev.preventDefault()
-  drawAll.clear()
-  socket.emit('drawclear')
-}
-
-const undoDraw = (_) => {
-  drawAll.undo()
-  socket.emit('undo')
-}
-
-/**
- * Request connection to server
- * server should take a screenshot
- * and send it back with a get_screen event
- */
-const loadScreen = () => {
-  if (connected) socket.emit('capture')
-}
-
-/**
- * Send end event to server
- * Close connection
- */
-const sendEnd = () => {
-  drawAll.clear()
-  showBackground(false)
-  showLoader(true)
-  socket.emit('end')
-  connected = false
-}
-
-/**
- * load image from buffer
- */
-const loadImageFromBuffer = (buf) => {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => resolve(img)
-    img.onerror = reject
-    img.src = 'data:image/jpeg;base64,' + buf
-  })
-}
-
-/**
- * check if image fit on canvas
- */
-const isNecesaryFit = (canvas, image) => {
-  return image.width > canvas.width && image.height > canvas.height
-}
-
-/**
- * calculate ratio to use
- */
-const calcRatio = (fit, src, dst) => {
-  ratio = { x: 1, y: 1 }
-  if (fit) {
-    ratio = {
-      x: src.width / dst.width,
-      y: src.height / dst.height
+  setStatus(message, state)
+  statusResetTimer = setTimeout(() => {
+    if (connected) {
+      if (capturing) {
+        setStatus('capturing', 'capturing')
+      } else if (drawingEnabled) {
+        setStatus('ready', 'ready')
+      } else {
+        setStatus('connected', 'connecting')
+      }
+    } else {
+      setStatus('...', 'connecting')
     }
-  }
-  emitLog(
-    // Image size
-    `Img ${src.width} ${src.height} ` +
-      // canvas size
-      `Canvas ${dst.width} ${dst.height}`
-  )
-  emitLog(`Ratio ${ratio.x} ${ratio.y}`)
-}
-
-/**
- * Adjust position using ratio
- * we sent a copy of the position
- * in a new object
- */
-const adjustPosition = (pos) => {
-  return {
-    x: pos.x * ratio.x,
-    y: pos.y * ratio.y,
-    lineWidth: pos.w * 10,
-    color: pos.c
-  }
-}
-
-/**
- * lock/unlock scroll
- */
-const lockUnlockScroll = (e) => {
-  if (container.style.overflow === 'hidden') {
-    container.style.overflow = 'scroll'
-    e.target.style.background = '#e7be4d'
-  } else {
-    container.style.overflow = 'hidden'
-    e.target.style.background = '#adff2f'
-  }
-}
-
-/**
- * server & client log
- */
-const emitLog = (msg, obj) => {
-  if (!log) return
-  socket.emit('log', msg)
-  if (typeof obj === 'object') {
-    socket.emit('log', JSON.stringify(obj))
-  }
+  }, ms)
 }
 
 const showLoader = (show) => {
-  loader.style.display = show ? 'block' : 'none'
-  loader.style.background = connected ? '#000' : '#fff'
+  loader.hidden = !show
 }
 
 const showBackground = (show) => {
-  background.style.display = show ? 'block' : 'none'
+  background.hidden = !show
 }
 
-const attachUIEvents = () => {
-  // events
-  const clearButton = document.getElementById('btn-clear')
-  const loadButton = document.getElementById('btn-load')
-  const endButton = document.getElementById('btn-end')
-  const scrollButton = document.getElementById('btn-scroll')
-  const undoButton = document.getElementById('btn-undo')
+const wsSend = (event, data = {}) => {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({ event, data }))
+  }
+}
 
-  // fast color buttons
-  colors.forEach((color) => {
-    const el = document.getElementById(color.element)
-    el.addEventListener('click', () => {
-      drawAll.changeColor(color.color)
+const ensureCaptureMeta = () => {
+  if (!sourceImage) {
+    return null
+  }
+  if (!captureMeta) {
+    captureMeta = {
+      sourceWidth: sourceImage.width,
+      sourceHeight: sourceImage.height,
+      scaleX: 1,
+      scaleY: 1,
+      captureSeq: 0,
+      captureTs: 0
+    }
+  }
+  captureMeta.scaleX = captureMeta.sourceWidth / sourceImage.width
+  captureMeta.scaleY = captureMeta.sourceHeight / sourceImage.height
+  return captureMeta
+}
+
+const paintBackground = () => {
+  const dpr = window.devicePixelRatio || 1
+  bgCtx.clearRect(0, 0, background.width / dpr, background.height / dpr)
+  if (!sourceImage) {
+    return
+  }
+  bgCtx.imageSmoothingEnabled = true
+  bgCtx.imageSmoothingQuality = 'high'
+  bgCtx.drawImage(
+    sourceImage,
+    viewport.offsetX,
+    viewport.offsetY,
+    viewport.width,
+    viewport.height
+  )
+}
+
+const drawStrokeSegmentCanvas = (points) => {
+  if (points.length < 2) {
+    return
+  }
+
+  drawCtx.strokeStyle = points[points.length - 1].color
+  drawCtx.lineWidth = points[points.length - 1].lineWidth
+  drawCtx.lineCap = 'round'
+  drawCtx.lineJoin = 'round'
+  drawCtx.beginPath()
+  drawCtx.moveTo(points[0].x, points[0].y)
+
+  for (let i = 1; i < points.length - 1; i += 1) {
+    const midX = (points[i].x + points[i + 1].x) / 2
+    const midY = (points[i].y + points[i + 1].y) / 2
+    drawCtx.quadraticCurveTo(points[i].x, points[i].y, midX, midY)
+  }
+
+  const last = points[points.length - 1]
+  drawCtx.lineTo(last.x, last.y)
+  drawCtx.stroke()
+}
+
+const sourcePointToCanvasPoint = (point) => {
+  const meta = ensureCaptureMeta()
+  const scaleX = meta?.scaleX || 1
+  const encodedX = point.x / scaleX
+  const encodedY = point.y / (meta?.scaleY || 1)
+  const encodedW = point.lineWidth / scaleX
+  return {
+    x: viewport.offsetX + encodedX * viewport.scale,
+    y: viewport.offsetY + encodedY * viewport.scale,
+    lineWidth: encodedW * viewport.scale,
+    color: point.color
+  }
+}
+
+const strokeSourceToCanvas = (stroke) => stroke.map(sourcePointToCanvasPoint)
+
+const redrawLocal = () => {
+  const dpr = window.devicePixelRatio || 1
+  drawCtx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr)
+  strokesSource.forEach((stroke) => {
+    drawStrokeSegmentCanvas(strokeSourceToCanvas(stroke))
+  })
+  if (currentStrokeSource.length > 1) {
+    drawStrokeSegmentCanvas(strokeSourceToCanvas(currentStrokeSource))
+  }
+}
+
+const setActiveColorButton = (value) => {
+  colors.forEach((entry) => {
+    const el = document.getElementById(entry.element)
+    el.classList.toggle('is-active', entry.color.toLowerCase() === value.toLowerCase())
+  })
+}
+
+const setColor = (value) => {
+  currentColor = value
+  colorPicker.value = value
+  setActiveColorButton(value)
+}
+
+const setActivePreset = (presetId) => {
+  ;['preset-fine', 'preset-medium', 'preset-bold'].forEach((id) => {
+    document.getElementById(id).classList.toggle('is-active', id === presetId)
+  })
+}
+
+const setBrushSize = (value, presetId = null) => {
+  brushSize = Number(value)
+  if (presetId) {
+    setActivePreset(presetId)
+  } else {
+    setActivePreset('')
+  }
+}
+
+const getCanvasPoint = (event) => {
+  const rect = canvas.getBoundingClientRect()
+  return {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+    lineWidth: brushSize,
+    color: currentColor
+  }
+}
+
+const computeViewport = () => {
+  const dpr = window.devicePixelRatio || 1
+  const cssW = canvas.width / dpr
+  const cssH = canvas.height / dpr
+
+  if (!sourceImage || sourceImage.width <= 0 || sourceImage.height <= 0) {
+    viewport.offsetX = 0
+    viewport.offsetY = 0
+    viewport.width = cssW
+    viewport.height = cssH
+    viewport.scale = 1
+    return
+  }
+
+  const sx = cssW / sourceImage.width
+  const sy = cssH / sourceImage.height
+  const scale = Math.min(sx, sy)
+  const width = Math.max(1, Math.round(sourceImage.width * scale))
+  const height = Math.max(1, Math.round(sourceImage.height * scale))
+  viewport.offsetX = Math.floor((cssW - width) / 2)
+  viewport.offsetY = Math.floor((cssH - height) / 2)
+  viewport.width = width
+  viewport.height = height
+  viewport.scale = scale
+}
+
+const isPointInViewport = (point) => (
+  point.x >= viewport.offsetX &&
+  point.x <= viewport.offsetX + viewport.width &&
+  point.y >= viewport.offsetY &&
+  point.y <= viewport.offsetY + viewport.height
+)
+
+const clampPointToViewport = (point) => ({
+  x: Math.min(Math.max(point.x, viewport.offsetX), viewport.offsetX + viewport.width),
+  y: Math.min(Math.max(point.y, viewport.offsetY), viewport.offsetY + viewport.height),
+  lineWidth: point.lineWidth,
+  color: point.color
+})
+
+const canvasPointToSourcePoint = (point) => {
+  const meta = ensureCaptureMeta()
+  const encodedX = (point.x - viewport.offsetX) / viewport.scale
+  const encodedY = (point.y - viewport.offsetY) / viewport.scale
+  const encodedW = point.lineWidth / viewport.scale
+  return {
+    x: encodedX * (meta?.scaleX || 1),
+    y: encodedY * (meta?.scaleY || 1),
+    lineWidth: encodedW * (meta?.scaleX || 1),
+    color: point.color
+  }
+}
+
+const clearLocalStrokes = () => {
+  strokesSource.length = 0
+  currentStrokeSource = []
+  redrawLocal()
+}
+
+const requestCapture = (reason = 'manual') => {
+  if (!connected || capturing) {
+    return
+  }
+  if (drawing) {
+    return
+  }
+  capturing = true
+  drawingEnabled = false
+  captureRequestedAtMs = performance.now()
+  showLoader(true)
+  setStatus('capturing', 'capturing')
+  wsSend('capture', { reason })
+}
+
+const scheduleResizeRecapture = () => {
+  if (!connected || capturing || !sourceImage) {
+    return
+  }
+  if (resizeCaptureTimer) {
+    clearTimeout(resizeCaptureTimer)
+  }
+  resizeCaptureTimer = setTimeout(() => {
+    requestCapture('resize')
+  }, 250)
+}
+
+const resizeCanvases = () => {
+  const toolbar = document.querySelector('.toolbar')
+  const availableHeight = window.innerHeight - toolbar.offsetHeight
+  const cssWidth = container.clientWidth
+  const cssHeight = availableHeight
+  const dpr = window.devicePixelRatio || 1
+
+  // Set canvas backing store to device pixels for sharp rendering
+  canvas.width = Math.round(cssWidth * dpr)
+  canvas.height = Math.round(cssHeight * dpr)
+  background.width = Math.round(cssWidth * dpr)
+  background.height = Math.round(cssHeight * dpr)
+
+  // CSS size stays at layout pixels
+  canvas.style.width = cssWidth + 'px'
+  canvas.style.height = cssHeight + 'px'
+  background.style.width = cssWidth + 'px'
+  background.style.height = cssHeight + 'px'
+
+  // Scale drawing contexts so coordinates stay in CSS pixels
+  bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
+  drawCtx.setTransform(dpr, 0, 0, dpr, 0, 0)
+
+  if (sourceImage) {
+    computeViewport()
+    paintBackground()
+    redrawLocal()
+    scheduleResizeRecapture()
+  }
+}
+
+const beginStroke = (event) => {
+  if (!connected || !drawingEnabled || capturing) {
+    return
+  }
+
+  event.preventDefault()
+  const point = getCanvasPoint(event)
+  if (!isPointInViewport(point)) {
+    flashStatus('outside', 'error', 900)
+    return
+  }
+
+  if (firstStrokeFeedbackPending && navigator.vibrate) {
+    navigator.vibrate(10)
+    firstStrokeFeedbackPending = false
+  }
+
+  canvas.setPointerCapture(event.pointerId)
+  drawing = true
+  const sourcePoint = canvasPointToSourcePoint(point)
+  currentStrokeSource = [sourcePoint]
+  wsSend('drawstart', sourcePoint)
+  redrawLocal()
+}
+
+const moveStroke = (event) => {
+  if (!drawing) {
+    return
+  }
+
+  event.preventDefault()
+  const point = clampPointToViewport(getCanvasPoint(event))
+  const sourcePoint = canvasPointToSourcePoint(point)
+  currentStrokeSource.push(sourcePoint)
+  redrawLocal()
+  wsSend('drawmove', sourcePoint)
+}
+
+const endStroke = (event) => {
+  if (!drawing) {
+    return
+  }
+
+  event.preventDefault()
+  drawing = false
+  if (currentStrokeSource.length > 0) {
+    strokesSource.push([...currentStrokeSource])
+    currentStrokeSource = []
+    redrawLocal()
+    wsSend('drawend')
+  }
+}
+
+const clearCanvas = () => {
+  const now = Date.now()
+  if (now - lastClearTapAt > 1200) {
+    lastClearTapAt = now
+    flashStatus('tap again', 'confirm', 1200)
+    return
+  }
+  lastClearTapAt = 0
+  // Cancel any in-progress stroke
+  drawing = false
+  clearLocalStrokes()
+  wsSend('drawclear')
+}
+
+const undoStroke = () => {
+  // Cancel any in-progress stroke first
+  if (drawing) {
+    drawing = false
+    currentStrokeSource = []
+    redrawLocal()
+    wsSend('drawend')
+    return
+  }
+  if (strokesSource.length === 0) {
+    return
+  }
+  strokesSource.pop()
+  redrawLocal()
+  wsSend('undo')
+}
+
+const endSession = () => {
+  if (!window.confirm('End session and disable overlay?')) {
+    return
+  }
+  drawing = false
+  drawingEnabled = false
+  clearLocalStrokes()
+  showBackground(false)
+  showLoader(true)
+  splashInfo.hidden = false
+  setStatus('ended', 'connecting')
+  wsSend('end')
+}
+
+const applyImage = async (blob, frameMeta) => {
+  const nextImage = await createImageBitmap(blob)
+  sourceImage = nextImage
+
+  if (frameMeta && frameMeta.captureSeq > 0) {
+    if (frameMeta.captureSeq <= lastAppliedCaptureSeq) {
+      capturing = false
+      drawingEnabled = true
+      return
+    }
+    lastAppliedCaptureSeq = frameMeta.captureSeq
+  }
+
+  if (frameMeta) {
+    captureMeta = {
+      sourceWidth: frameMeta.sourceWidth,
+      sourceHeight: frameMeta.sourceHeight,
+      scaleX: 1,
+      scaleY: 1,
+      captureSeq: frameMeta.captureSeq,
+      captureTs: frameMeta.captureTs
+    }
+  } else if (!captureMeta) {
+    captureMeta = {
+      sourceWidth: sourceImage.width,
+      sourceHeight: sourceImage.height,
+      encodedWidth: sourceImage.width,
+      encodedHeight: sourceImage.height,
+      scaleX: 1,
+      scaleY: 1,
+      captureSeq: 0,
+      captureTs: 0
+    }
+  }
+  ensureCaptureMeta()
+
+  computeViewport()
+  paintBackground()
+  showBackground(true)
+  showLoader(false)
+  splashInfo.hidden = true
+  drawingEnabled = true
+  capturing = false
+  firstStrokeFeedbackPending = true
+
+  const readyW = captureMeta?.sourceWidth || sourceImage.width
+  const readyH = captureMeta?.sourceHeight || sourceImage.height
+  setStatus(`ready ${readyW}x${readyH}`, 'ready')
+  redrawLocal()
+}
+
+const handleControlMessage = (msg) => {
+  if (msg.event === 'capture_started') {
+    capturing = true
+    drawingEnabled = false
+    showLoader(true)
+    setStatus('capturing', 'capturing')
+  } else if (msg.event === 'capture_ready') {
+    const sourceWidth = Number(msg.data?.sourceWidth || 0)
+    const sourceHeight = Number(msg.data?.sourceHeight || 0)
+    const captureSeq = Number(msg.data?.capture_seq || 0)
+    const captureTs = Number(msg.data?.capture_ts || 0)
+
+    if (sourceWidth > 0 && sourceHeight > 0) {
+      pendingCaptureMeta = {
+        sourceWidth,
+        sourceHeight,
+        captureSeq,
+        captureTs
+      }
+    } else {
+      pendingCaptureMeta = null
+    }
+    setStatus('receiving', 'capturing')
+  } else if (msg.event === 'capture_failed') {
+    capturing = false
+    drawingEnabled = Boolean(sourceImage)
+    showLoader(false)
+    setStatus(msg.data?.message || 'failed', 'error')
+  } else if (msg.event === 'error') {
+    flashStatus(msg.data?.message || 'server error', 'error', 1500)
+  }
+}
+
+const connectWebSocket = () => {
+  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
+  ws = new WebSocket(`${protocol}//${location.host}`)
+  ws.binaryType = 'blob'
+
+  ws.onopen = () => {
+    connected = true
+    reconnectDelay = RECONNECT_MIN
+    setStatus('connected', 'connecting')
+    requestCapture('connect')
+  }
+
+  ws.onclose = () => {
+    connected = false
+    capturing = false
+    drawing = false
+    drawingEnabled = false
+    pendingCaptureMeta = null
+    showBackground(Boolean(sourceImage))
+    showLoader(true)
+    setStatus('...', 'connecting')
+    setTimeout(connectWebSocket, reconnectDelay)
+    reconnectDelay = Math.min(reconnectDelay * 1.5, RECONNECT_MAX)
+  }
+
+  ws.onerror = () => {
+    // onclose will fire after this — no action needed
+  }
+
+  ws.onmessage = async (event) => {
+    if (typeof event.data === 'string') {
+      try {
+        handleControlMessage(JSON.parse(event.data))
+      } catch (_) {
+        flashStatus('unexpected message', 'error', 1200)
+      }
+      return
+    }
+
+    const frameMeta = pendingCaptureMeta
+    pendingCaptureMeta = null
+    await applyImage(event.data, frameMeta)
+  }
+}
+
+const bindToolbar = () => {
+  document.getElementById('btn-load').addEventListener('click', () => requestCapture('capture'))
+  document.getElementById('btn-clear').addEventListener('click', clearCanvas)
+  document.getElementById('btn-undo').addEventListener('click', undoStroke)
+  document.getElementById('btn-screenshot').addEventListener('click', () => {
+    wsSend('screenshot')
+    flashStatus('saved', 'ready', 1200)
+  })
+  document.getElementById('btn-fullscreen').addEventListener('click', () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen()
+    } else {
+      document.documentElement.requestFullscreen()
+    }
+  })
+  document.getElementById('btn-end').addEventListener('click', endSession)
+
+  document.getElementById('preset-fine').addEventListener('click', () => {
+    setBrushSize(presetMap.fine, 'preset-fine')
+  })
+  document.getElementById('preset-medium').addEventListener('click', () => {
+    setBrushSize(presetMap.medium, 'preset-medium')
+  })
+  document.getElementById('preset-bold').addEventListener('click', () => {
+    setBrushSize(presetMap.bold, 'preset-bold')
+  })
+
+  colors.forEach((entry) => {
+    document.getElementById(entry.element).addEventListener('click', () => {
+      setColor(entry.color)
     })
   })
 
-  // custom color
-  const customColor = document.getElementById('btn-color')
-  customColor.addEventListener('change', (ev) => {
-    drawAll.changeColor(ev.target.value)
-  })
-
-  // rest of actions
-  clearButton.addEventListener('click', clearCanvas)
-  loadButton.addEventListener('click', loadScreen)
-  scrollButton.addEventListener('click', lockUnlockScroll)
-  undoButton.addEventListener('click', undoDraw)
-  endButton.addEventListener('click', sendEnd)
-}
-
-const initDrawAll = () => {
-  const menuHeight = 22
-  // set initial canvas size
-  canvas.width = window.innerWidth
-  canvas.height = window.innerHeight - menuHeight
-
-  // image loaded on background
-  background.width = window.innerWidth
-  background.height = window.innerHeight - menuHeight
-
-  drawAll.clear()
-  drawAll.changeColor(colors[1].color)
-
-  drawAll.addEventListener('drawstart', (ev) => {
-    socket.emit('drawstart', adjustPosition(ev.detail))
-  })
-
-  drawAll.addEventListener('drawmove', (ev) => {
-    emitLog('drawmove', ev.detail)
-    socket.emit('drawmove', adjustPosition(ev.detail))
-  })
-
-  drawAll.addEventListener('drawend', (ev) => {
-    emitLog('drawend', ev.detail)
-    socket.emit('drawend')
+  colorPicker.addEventListener('input', (event) => {
+    setColor(event.target.value)
   })
 }
 
-const initComs = () => {
-  socket.on('connect', () => {
-    emitLog('Client Connected')
-    drawAll.clear()
-    showLoader(true)
-    connected = true
-  })
-
-  socket.on('disconnect', (reason) => {
-    connected = false
-    showBackground(false)
-    showLoader(true)
-    if (reason === 'io server disconnect') {
-      socket.connect()
-    }
-  })
-
-  socket.on('screen', async (data) => {
-    emitLog('rcvd screen')
-    let img = await loadImageFromBuffer(data.buffer)
-    emitLog('rcvd screen: ' + data.buffer.length)
-    let fit = isNecesaryFit(canvas, img)
-    // resize canvas, fit if necessary
-    resizeCanvas(canvas, img, container, fit)
-    drawImage(backgroundCtx, img, fit)
-    calcRatio(fit, img, canvas)
-    emitLog('ratio', ratio)
-    showBackground(true)
-    showLoader(false)
-    connected = true
-    drawAll.clear()
-  })
+const bindCanvas = () => {
+  canvas.addEventListener('pointerdown', beginStroke)
+  canvas.addEventListener('pointermove', moveStroke)
+  canvas.addEventListener('pointerup', endStroke)
+  canvas.addEventListener('pointercancel', endStroke)
 }
 
-window.onload = () => {
-  attachUIEvents()
-  initDrawAll()
-  initComs()
-}
+window.addEventListener('resize', resizeCanvases)
+window.addEventListener('orientationchange', () => {
+  setTimeout(resizeCanvases, 100)
+})
+document.addEventListener('fullscreenchange', resizeCanvases)
+
+window.addEventListener('load', () => {
+  bindToolbar()
+  bindCanvas()
+  setColor(currentColor)
+  setBrushSize(brushSize, 'preset-fine')
+  resizeCanvases()
+  showBackground(false)
+  showLoader(true)
+  setStatus('...', 'connecting')
+  connectWebSocket()
+})

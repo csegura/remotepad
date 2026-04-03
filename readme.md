@@ -1,139 +1,132 @@
 # RemotePad
 
-Crazy idea to draw over screen using any tablet or phone :-) of course on linux
+Use your tablet or phone as a drawing pad for any application window on your Linux or Windows desktop.
 
-Is a client-server application that allows users to use their tablet devices to draw over their computer screen. It is designed to enhance creativity and collaboration by providing an interactive drawing experience. This documentation will guide you through the installation, setup, and usage of the program.
+![](doc/remotepad.png)
 
-WORK IN PROGRESS
+RemotePad is a Linux/X11 (sorry wayland) and Windows tool that lets you draw over an application window from a tablet/phone browser connected on the same network.
 
-### Features
-
-- Two drawing modes: Mouse Drawing Mode (local) and Tablet Drawing Mode (remote)
-- Tablet Drawing Mode accessible via a web interface, compatible with various tablet devices including iPads and Android tablets/phones.
-- Screen capture and drawing capabilities on captured images.
-- Supports image resizing for optimal tablet viewing.
-
-### Demo
-
-(video here)
 
 ![](doc/screenshot.png)
 
-## Installation
+### Features
 
-For this test version
+- App input priority mode: local app remains interactive while overlay is visible
+- Tablet drawing via web interface (works on iPads, Android tablets/phones)
+- Screen capture with drawing overlay
+- Image resizing for optimal tablet viewing
+- Single-binary deployment (client files embedded at build time)
+- Hotkeys for quick actions (color change, screenshot, clear, undo, quit)
 
-- clone this repo
-- cd remotepad
-- npm install
-- ./remotepad.sh
+## Usage
 
-## Use
+### Linux
 
+```bash
+remotepad                   # Click to select a window
+remotepad current           # Use the focused window
+remotepad list              # Print selectable windows
+remotepad <window-id>       # Use window by X11 ID (decimal or hex)
+remotepad stop              # Stop running instance
+remotepad current -p 8080   # Use custom port
 ```
-./remotepad.sh
+
+### Windows
+
+```powershell
+remotepad.exe               # Click to select a window
+remotepad.exe current       # Use the foreground window
+remotepad.exe list          # Print selectable windows
+remotepad.exe <hwnd>        # Use window by handle (decimal or hex)
+remotepad.exe stop          # Stop running instance
+remotepad.exe current -p 8080  # Use custom port
 ```
 
-### parameters
+The binary selects the window and goes to background automatically on both platforms. The server runs on port `50005` by default. Access the drawing interface from your tablet at `http://<your-ip>:50005`.
 
-- none - select the window to use
-- current - use the current window
-- <id> - use the window with id number
+### Tablet UI
 
-Application runs a server (localhost:3000) ....
+| Button | Action |
+|--------|--------|
+| Refresh (&#8635;) | Capture/refresh the screen from the target window |
+| R / G / B dots | Switch drawing color (red, green, blue) |
+| Color picker | Choose a custom drawing color |
+| F / M / B | Brush size preset (fine, medium, bold) |
+| Undo (&#8617;) | Undo last stroke |
+| Clear (&times;) | Clear all drawings (tap twice to confirm) |
+| Screenshot (camera) | Save a screenshot to disk |
+| Fullscreen (arrows) | Toggle tablet fullscreen mode |
+| End (square) | End session and disable overlay |
 
-- Select target window
-- Server remains in background waitting for activation
+### Quit hotkey
 
-  - You can access to the client from your tablet using <your-ip>:3000
+Press `CTRL+SHIFT+Q` on the desktop to stop remotepad. All other controls are on the tablet UI.
 
-- On local
+### Configuration
 
-  - CTRL+SHIFT+d - begins drawing mode (cursor arrow)
-    - You can draw using your mouse + left button
-    - mouse right button clear screen and terminate drawing mode
-  - CTRL+SHIFT+e - terminate drawing mode
+Port priority (highest to lowest):
+1. `-p` command-line flag
+2. `SERVER_PORT` environment variable or `.env` file
+3. Default: `50005`
 
-  - In drawing mode on your computer
-    - CTRL+SHIFT+r change foreground to red
-    - CTRL+SHIFT+g change foreground to green
-    - CTRL+SHIFT+b change foreground to blue
-    - CTRL+SHIFT+s take an screenshot of current screen
-    - CTRL+SHIFT+c clear screen
-    - CTRL+SHIFT+u undo
+Optional `.env` file or environment variables:
 
-....
+- `SERVER_PORT=50005`
 
-#### Motivation
 
-Learn X11, use my tablet, have fun
+## Building
 
-### Tips
+### Linux
 
-#### Use in Visual Studio Code
+```bash
+make
+```
 
-Add a keyboard shortcut I am using CTRL+Shift+9, use preferences (Open Keyboard shortcuts (JSON)) to map the desired keys. Don´t use the default
+Or with CMake:
+
+```bash
+mkdir -p build && cd build
+cmake ..
+make -j"$(nproc)"
+```
+
+Dependencies: X11, Xfixes, Xext, libjpeg, zlib, pthreads.
+
+To build without embedded client files (serve from `client/` directory at runtime):
+
+```bash
+make EMBED_CLIENT=0
+```
+
+### Windows (Visual Studio 2022)
+
+Requirements:
+- Visual Studio 2022 with Desktop development with C++
+- CMake (bundled with VS is fine)
+
+```powershell
+cmake --preset vs2022-x64
+cmake --build --preset vs2022-x64-release
+```
+
+
+
+## VS Code Integration
+
+Add a keyboard shortcut (e.g. CTRL+Shift+9) via Preferences > Open Keyboard Shortcuts (JSON):
 
 ![](doc/vs_command.png)
 
-Sample
-
-```
-// Place your key bindings in this file to override the defaults
+```json
 [{
     "key": "ctrl+shift+9",
     "command": "workbench.action.terminal.sendSequence",
-    "args": { "text": "~/dev_local/remotepad/remotepad.sh current\u000D" }
-}
-]
+    "args": { "text": "remotepad current\u000D" }
+}]
 ```
 
-### Contributing
+## License
 
-#### TODO
+MIT License - Carlos Segura (@romheat)
 
-- [ ] Improve client interface
-- [ ] Smooth draw on X11
-- [x] Stream image
-- [x] Config file
-- [ ] Test on different wm (I'm using i3)
-
-#### Development
-
-- Interested in contributing to the development of this program? Check out the GitHub repository for more details.
-
-#### Bug Reporting
-
-- If you find and report a bug, you're contributing too! Follow the bug reporting guidelines on the GitHub repository.
-
-#### Feature Requests
-
-- We welcome your ideas for new features and improvements. Share your suggestions on the GitHub repository's issue tracker.
-
-#### Special Thanks (Related software)
-
-I would like to express my sincere gratitude to the authors and contributors of the following open-source software packages, libraries, and tools. Without their hard work and dedication, our project would not have been possible:
-
-- [**node-x11**](https://github.com/sidorares/node-x11): - Andrey Sidorov - X11 node.js network protocol client
-- [**JIMP**](https://github.com/jimp-dev): - An image processing library written entirely in JavaScript for Node, with zero external or native dependencies
-- [**socket.io**](https://github.com/socketio/socket.io): node.js eal-time bidirectional event-based communication
-- [**express**](https://github.com/expressjs/express): Fast, unopinionated, minimalist web framework
-
-### License
-
-This program is released under the MIT License. You can find the full license text in the program repository.
-
-### Author
-
-Carlos Segura (@romheat)
-
-#### Misc
-
-- (https://w3c.github.io/pointerevents)
-- node_modules/x11/lib/keysyms.js - see examples in x11 source code
-
-#### x11 tools used
-
-- xev - get keycodes and mouse events
-- xwininfo - get info and windows id
-- xprop - get window properties
+The author condemns war and armed aggression, and does not support the use of this software for military aggression, war crimes, or attacks on civilians.
