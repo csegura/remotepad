@@ -36,16 +36,22 @@ std::string toUtf8(const std::wstring& value) {
 constexpr int kCurveSegments = 15;
 constexpr UINT kHotkeyModifiers = MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT;
 constexpr int kHotkeyQ = 110;
+constexpr int kHotkeyComma = 111;
 
 void registerHotkeys(HWND hwnd) {
     if (!RegisterHotKey(hwnd, kHotkeyQ, kHotkeyModifiers, 'Q')) {
         std::cerr << "Warning: failed to register quit hotkey CTRL+SHIFT+Q"
                   << " (error " << GetLastError() << ")" << std::endl;
     }
+    if (!RegisterHotKey(hwnd, kHotkeyComma, kHotkeyModifiers, VK_OEM_COMMA)) {
+        std::cerr << "Warning: failed to register clear hotkey CTRL+SHIFT+,"
+                  << " (error " << GetLastError() << ")" << std::endl;
+    }
 }
 
 void unregisterHotkeys(HWND hwnd) {
     UnregisterHotKey(hwnd, kHotkeyQ);
+    UnregisterHotKey(hwnd, kHotkeyComma);
 }
 
 } // namespace
@@ -346,6 +352,8 @@ LRESULT CALLBACK WinOverlay::windowProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
 void WinOverlay::handleHotkey(int hotkeyId) {
     if (hotkeyId == kHotkeyQ) {
         pushAction(platform::OverlayAction::Terminate);
+    } else if (hotkeyId == kHotkeyComma) {
+        pushAction(platform::OverlayAction::Clear);
     }
 }
 

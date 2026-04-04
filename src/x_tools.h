@@ -27,6 +27,7 @@ struct XKey {
     static constexpr int d     = 40;
     static constexpr int e     = 26;
     static constexpr int u     = 30;
+    static constexpr int comma = 59;
     static constexpr int CTRL  = 37;
     static constexpr int SHIFT = 50;
 };

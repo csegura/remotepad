@@ -111,6 +111,7 @@ bool LinuxOverlay::init() {
 
     constexpr unsigned int modMask = ShiftMask | ControlMask;
     XGrabKey(dpy_, xtools::XKey::q, modMask, root_, False, GrabModeAsync, GrabModeAsync);
+    XGrabKey(dpy_, xtools::XKey::comma, modMask, root_, False, GrabModeAsync, GrabModeAsync);
 
     XFlush(dpy_);
     return true;
@@ -137,6 +138,8 @@ std::vector<platform::OverlayAction> LinuxOverlay::pollActions() {
 
         if (ev.xkey.keycode == xtools::XKey::q) {
             actions.push_back(platform::OverlayAction::Terminate);
+        } else if (ev.xkey.keycode == xtools::XKey::comma) {
+            actions.push_back(platform::OverlayAction::Clear);
         }
     }
 
