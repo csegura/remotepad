@@ -379,6 +379,10 @@ int main(int argc, char* argv[]) {
     std::cout << "remotepad running (pid " << childPid << ")" << std::endl;
     std::cout << "  Tablet: http://" << ip << ":" << config.port << std::endl;
     std::cout << "  Stop:   remotepad stop" << std::endl;
+
+    std::cout << "\nKeys:\n"
+            << "  CTRL+SHIFT+,   Clear drawings\n"
+            << "  CTRL+SHIFT+Q   Quit\n" << std::endl;
     return 0;
 }
 
@@ -882,6 +886,10 @@ int main(int argc, char* argv[]) {
     std::cout << "remotepad running (pid " << childPid << ")" << std::endl;
     std::cout << "  Tablet: http://" << ip << ":" << config.port << std::endl;
     std::cout << "  Stop:   remotepad.exe stop" << std::endl;
+
+    std::cout << "\nKeys:\n"
+        << "  CTRL+SHIFT+,   Clear drawings\n"
+        << "  CTRL+SHIFT+Q   Quit\n" << std::endl;
     return 0;
 }
 
