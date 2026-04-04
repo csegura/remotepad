@@ -6,7 +6,6 @@ Use your tablet or phone as a drawing pad for any application window on your Lin
 
 RemotePad is a Linux/X11 (sorry wayland) and Windows tool that lets you draw over an application window from a tablet/phone browser connected on the same network.
 
-
 ![](doc/screenshot.png)
 
 ### Features
@@ -52,15 +51,17 @@ The binary selects the window and goes to background automatically on both platf
 | R / G / B dots | Switch drawing color (red, green, blue) |
 | Color picker | Choose a custom drawing color |
 | F / M / B | Brush size preset (fine, medium, bold) |
+| Pen toggle (&#9998;) | Toggle pen-only / hand-pen mode |
 | Undo (&#8617;) | Undo last stroke |
 | Clear (&times;) | Clear all drawings (tap twice to confirm) |
 | Screenshot (camera) | Save a screenshot to disk |
 | Fullscreen (arrows) | Toggle tablet fullscreen mode |
 | End (square) | End session and disable overlay |
 
-### Quit hotkey
+### Hotkeys
 
-Press `CTRL+SHIFT+Q` on the desktop to stop remotepad. All other controls are on the tablet UI.
+- `CTRL+SHIFT+Q` to quit remotepad on desktop and tablet
+- `CTRL+SHIFT+,` to clear screen on desktop and tablet
 
 ### Configuration
 
@@ -110,7 +111,6 @@ cmake --build --preset vs2022-x64-release
 ```
 
 
-
 ## VS Code Integration
 
 Add a keyboard shortcut (e.g. CTRL+Shift+9) via Preferences > Open Keyboard Shortcuts (JSON):
@@ -127,6 +127,6 @@ Add a keyboard shortcut (e.g. CTRL+Shift+9) via Preferences > Open Keyboard Shor
 
 ## License
 
-MIT License - Carlos Segura (@romheat)
+MIT License - Carlos Segura 2023-2026 s(@romheat)
 
 The author condemns war and armed aggression, and does not support the use of this software for military aggression, war crimes, or attacks on civilians.
