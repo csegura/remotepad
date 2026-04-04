@@ -36,6 +36,8 @@ private:
     RemotePad& pad_;
     struct us_listen_socket_t* listenSocket_ = nullptr;
     uWS::Loop* loop_ = nullptr;
+    std::string instanceId_;
+    std::function<void(std::string_view)> broadcast_;
     std::atomic<bool> running_{false};
     std::thread platformWatcher_;
     std::function<void()> closeApp_;

@@ -37,6 +37,12 @@ void RemotePad::processEvents() {
     }
 }
 
+bool RemotePad::consumeClearFlag() {
+    bool was = clearPending_;
+    clearPending_ = false;
+    return was;
+}
+
 void RemotePad::drawStart(double x, double y, double lineWidth, const std::string& color) {
     const uint32_t strokeColor = color.empty() ? currentColor_ : draw::parseWebColor(color);
     currentColor_ = strokeColor;
@@ -154,6 +160,7 @@ void RemotePad::applyOverlayAction(platform::OverlayAction action) {
         break;
     case platform::OverlayAction::Clear:
         clearDraw(false);
+        clearPending_ = true;
         break;
     case platform::OverlayAction::Undo:
         clearDraw(true);

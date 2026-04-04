@@ -9,6 +9,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <random>
 #include <string_view>
 #include <thread>
 
@@ -49,7 +50,11 @@ static bool decodeDrawPayload(const json& data, double& x, double& y, double& li
 }
 
 WebServer::WebServer(int port, const std::string& staticDir, RemotePad& pad)
-    : port_(port), staticDir_(staticDir), pad_(pad) {}
+    : port_(port), staticDir_(staticDir), pad_(pad) {
+    std::random_device rd;
+    std::mt19937_64 gen(rd());
+    instanceId_ = std::to_string(gen());
+}
 
 std::string WebServer::getMimeType(const std::string& path) {
     if (path.ends_with(".html")) return "text/html";
@@ -74,6 +79,11 @@ void WebServer::processPlatformEvents() {
     pad_.processEvents();
     if (pad_.shouldTerminate()) {
         shutdown();
+        return;
+    }
+    if (pad_.consumeClearFlag() && broadcast_) {
+        json evt = {{"event", "clear"}};
+        broadcast_(evt.dump());
     }
 }
 
@@ -190,12 +200,16 @@ void WebServer::run() {
 
     RemotePad* padPtr = &pad_;
     const std::string staticDir = staticDir_;
+    const std::string& instanceId = instanceId_;
     running_ = true;
 
     app.ws<PerSocketData>("/*", uWS::App::WebSocketBehavior<PerSocketData>{
-        .open = [](WsType* ws) {
+        .open = [&instanceId](WsType* ws) {
             auto* perSocket = ws->getUserData();
             perSocket->captureSeq = 0;
+            ws->subscribe("broadcast");
+            json hello = {{"event", "hello"}, {"data", {{"instanceId", instanceId}}}};
+            ws->send(hello.dump(), uWS::OpCode::TEXT);
             std::cout << "Client connected" << std::endl;
         },
         .message = [padPtr](WsType* ws, std::string_view message, uWS::OpCode /*opCode*/) {
@@ -243,7 +257,6 @@ void WebServer::run() {
             std::cout << "RemotePad v" << REMOTEPAD_VERSION
                       << " - Running on port " << port_ << std::endl;
             std::cout << REMOTEPAD_URL << std::endl;
-            std::cout << "Quit: CTRL+SHIFT+Q" << std::endl;
         } else {
             std::cerr << "Failed to listen on port " << port_ << std::endl;
         }
@@ -251,6 +264,9 @@ void WebServer::run() {
 
     loop_ = uWS::Loop::get();
     closeApp_ = [&app]() { app.close(); };
+    broadcast_ = [&app](std::string_view msg) {
+        app.publish("broadcast", msg, uWS::OpCode::TEXT);
+    };
     platformWatcher_ = std::thread([this]() { watchPlatform(); });
 
     app.run();

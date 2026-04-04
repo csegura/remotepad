@@ -30,6 +30,7 @@ public:
     void takeScreenshot(const std::string& dir);
 
     bool shouldTerminate() const { return terminate_; }
+    bool consumeClearFlag();
     int getEventFd() const;
     const std::string& targetName() const { return targetName_; }
 
@@ -42,6 +43,7 @@ private:
 
     bool drawing_ = false;
     bool terminate_ = false;
+    bool clearPending_ = false;
 
     std::string targetName_;
     uint32_t currentColor_ = 0;
