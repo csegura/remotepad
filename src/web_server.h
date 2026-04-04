@@ -2,6 +2,7 @@
 
 #include "remote_pad.h"
 #include <atomic>
+#include <functional>
 #include <string>
 #include <thread>
 
@@ -18,7 +19,10 @@ public:
     // Start the server (runs the uWS event loop)
     void run();
 
-    // Stop the server
+    // Graceful shutdown: clear overlay draws, then stop the server
+    void shutdown();
+
+    // Stop the server (close all sockets)
     void stop();
 
 private:
@@ -34,4 +38,5 @@ private:
     uWS::Loop* loop_ = nullptr;
     std::atomic<bool> running_{false};
     std::thread platformWatcher_;
+    std::function<void()> closeApp_;
 };

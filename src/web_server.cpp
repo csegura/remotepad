@@ -73,7 +73,7 @@ std::string WebServer::readFile(const std::string& path) {
 void WebServer::processPlatformEvents() {
     pad_.processEvents();
     if (pad_.shouldTerminate()) {
-        stop();
+        shutdown();
     }
 }
 
@@ -250,9 +250,11 @@ void WebServer::run() {
     });
 
     loop_ = uWS::Loop::get();
+    closeApp_ = [&app]() { app.close(); };
     platformWatcher_ = std::thread([this]() { watchPlatform(); });
 
     app.run();
+    closeApp_ = nullptr;
 
     running_ = false;
     if (platformWatcher_.joinable()) {
@@ -260,10 +262,20 @@ void WebServer::run() {
     }
 }
 
+void WebServer::shutdown() {
+    pad_.drawClear();
+    pad_.deactivateOverlay();
+    stop();
+}
+
 void WebServer::stop() {
-    running_ = false;
-    if (listenSocket_) {
-        us_listen_socket_close(0, listenSocket_);
-        listenSocket_ = nullptr;
+    if (!running_.exchange(false)) return;
+    if (loop_) {
+        loop_->defer([this]() {
+            if (closeApp_) {
+                closeApp_();
+            }
+            listenSocket_ = nullptr;
+        });
     }
 }

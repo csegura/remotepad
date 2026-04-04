@@ -218,6 +218,9 @@ static int runServerForeground(Window target, int portOverride) {
 
     server.run();
 
+    pad.drawClear();
+    pad.deactivateOverlay();
+
     g_server = nullptr;
     XCloseDisplay(dpy);
     return 0;
@@ -397,6 +400,7 @@ int main(int argc, char* argv[]) {
 #include <stdexcept>
 #include <string>
 #include <system_error>
+#include <thread>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -484,6 +488,10 @@ static void removePidFile() {
     fs::remove(getPidFilePath(), ec);
 }
 
+static std::string getStopEventName() {
+    return "remotepad_stop_event";
+}
+
 static int doStop() {
     const fs::path pidFile = getPidFilePath();
     std::ifstream f(pidFile);
@@ -501,33 +509,21 @@ static int doStop() {
         return 1;
     }
 
-    HANDLE process = OpenProcess(PROCESS_TERMINATE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, static_cast<DWORD>(pid));
-    if (!process) {
+    if (!isProcessRunning(static_cast<DWORD>(pid))) {
         std::cerr << "Process " << pid << " not running (stale pid file removed)" << std::endl;
         std::error_code ec;
         fs::remove(pidFile, ec);
         return 1;
     }
 
-    DWORD code = 0;
-    if (!GetExitCodeProcess(process, &code) || code != STILL_ACTIVE) {
-        CloseHandle(process);
-        std::cerr << "Process " << pid << " not running (stale pid file removed)" << std::endl;
-        std::error_code ec;
-        fs::remove(pidFile, ec);
+    HANDLE event = OpenEventA(EVENT_MODIFY_STATE, FALSE, getStopEventName().c_str());
+    if (!event) {
+        std::cerr << "Cannot signal process " << pid << " (event not found)" << std::endl;
         return 1;
     }
+    SetEvent(event);
+    CloseHandle(event);
 
-    if (!TerminateProcess(process, 0)) {
-        const DWORD err = GetLastError();
-        CloseHandle(process);
-        std::cerr << "Failed to stop process " << pid << " (error " << err << ")" << std::endl;
-        return 1;
-    }
-    CloseHandle(process);
-
-    std::error_code ec;
-    fs::remove(pidFile, ec);
     std::cout << "remotepad stopped (pid " << pid << ")" << std::endl;
     return 0;
 }
@@ -726,8 +722,27 @@ static int runServerForeground(HWND target, int portOverride) {
     writePidFile();
     std::atexit(removePidFile);
 
+    HANDLE stopEvent = CreateEventA(nullptr, TRUE, FALSE, getStopEventName().c_str());
+
     WebServer server(config.port, staticDir.string(), pad);
+
+    std::thread stopWatcher([&server, stopEvent]() {
+        if (!stopEvent) return;
+        WaitForSingleObject(stopEvent, INFINITE);
+        server.stop();
+    });
+
     server.run();
+
+    pad.drawClear();
+    pad.deactivateOverlay();
+
+    if (stopEvent) {
+        SetEvent(stopEvent);
+        if (stopWatcher.joinable()) stopWatcher.join();
+        CloseHandle(stopEvent);
+    }
+
     return 0;
 }
 
