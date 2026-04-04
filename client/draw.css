@@ -55,6 +55,23 @@ body {
   padding-right: 0;
 }
 
+.toolbar-brand {
+  flex: 1;
+  text-align: center;
+  font-size: 0.65rem;
+  color: var(--muted);
+  opacity: 0.6;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+@media (max-width: 600px) {
+  .toolbar-brand {
+    display: none;
+  }
+}
+
 .toolbar-end {
   display: inline-flex;
   align-items: center;
@@ -185,6 +202,11 @@ body {
   overflow: hidden;
 }
 
+.container.disconnected > canvas {
+  filter: blur(4px) brightness(0.7);
+  transition: filter 0.3s ease;
+}
+
 .disable-select {
   user-select: none;
   -webkit-user-select: none;
@@ -206,13 +228,14 @@ body {
 
 .loader {
   position: absolute;
-  inset: calc(50% - 20px) auto auto calc(50% - 20px);
-  width: 40px;
-  height: 40px;
-  border: 2px solid rgba(255, 255, 255, 0.1);
-  border-top-color: rgba(255, 255, 255, 0.4);
+  inset: calc(50% - 24px) auto auto calc(50% - 24px);
+  width: 48px;
+  height: 48px;
+  border: 2px solid rgba(255, 255, 255, 0.06);
+  border-top-color: var(--accent);
   border-radius: 50%;
-  animation: rotation 0.9s linear infinite;
+  animation: rotation 0.8s cubic-bezier(0.5, 0.1, 0.5, 0.9) infinite;
+  box-shadow: 0 0 12px rgba(173, 255, 47, 0.15);
 }
 
 .splash-info {
@@ -222,8 +245,9 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding-top: 3rem;
+  padding-top: 5rem;
   pointer-events: none;
+  gap: 0.15rem;
 }
 
 .splash-title {

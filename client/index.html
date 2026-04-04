@@ -6,7 +6,7 @@
     <title>RemotePad</title>
     <meta name="description" content="Remote draw over the screen" />
     <meta name="author" content="Carlos Segura (@romheat)" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <link rel="stylesheet" href="draw.css" />
   </head>
   <body>
@@ -32,6 +32,13 @@
             <button id="preset-bold" class="btn preset" type="button">B</button>
           </div>
           <div class="toolbar-group">
+            <button id="btn-pen-only" class="btn preset" type="button" title="Pen only (reject touch/mouse)">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M10.5 2.5l3 3L5.5 13.5H2.5v-3z"/>
+              </svg>
+            </button>
+          </div>
+          <div class="toolbar-group">
             <button id="btn-undo" class="btn" type="button" title="Undo">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M3 6h7a3 3 0 0 1 0 6H8"/><path d="M6 3L3 6l3 3"/>
@@ -51,6 +58,11 @@
             </button>
           </div>
           <span id="status-chip" class="chip connecting">...</span>
+          <span class="toolbar-brand">
+            <a class="splash-link" href="https://github.com/csegura/remotepad" target="_blank">
+            RemotePad v1.0.0 2026 @romheat
+            </a>
+          </span>
           <div class="toolbar-end">
             <button id="btn-fullscreen" class="btn" type="button" title="Toggle fullscreen">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">

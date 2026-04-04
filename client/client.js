@@ -12,6 +12,7 @@ let ws = null
 let connected = false
 let capturing = false
 let drawingEnabled = false
+let penOnly = true
 let currentColor = '#adff2f'
 let brushSize = 2
 let sourceImage = null
@@ -24,6 +25,7 @@ let statusResetTimer = null
 let captureRequestedAtMs = 0
 let lastAppliedCaptureSeq = 0
 let reconnectDelay = 500
+let serverInstanceId = null
 const RECONNECT_MIN = 500
 const RECONNECT_MAX = 5000
 
@@ -337,6 +339,9 @@ const beginStroke = (event) => {
   if (!connected || !drawingEnabled || capturing) {
     return
   }
+  if (penOnly && event.pointerType !== 'pen') {
+    return
+  }
 
   event.preventDefault()
   const point = getCanvasPoint(event)
@@ -350,7 +355,7 @@ const beginStroke = (event) => {
     firstStrokeFeedbackPending = false
   }
 
-  canvas.setPointerCapture(event.pointerId)
+  canvas.setPointerCapture?.(event.pointerId)
   drawing = true
   const sourcePoint = canvasPointToSourcePoint(point)
   currentStrokeSource = [sourcePoint]
@@ -483,6 +488,21 @@ const applyImage = async (blob, frameMeta) => {
 }
 
 const handleControlMessage = (msg) => {
+  if (msg.event === 'hello') {
+    const newId = msg.data?.instanceId || null
+    if (serverInstanceId !== null && newId !== serverInstanceId) {
+      clearLocalStrokes()
+      lastAppliedCaptureSeq = 0
+    }
+    serverInstanceId = newId
+    requestCapture('connect')
+    return
+  }
+  if (msg.event === 'clear') {
+    clearLocalStrokes()
+    redrawLocal()
+    return
+  }
   if (msg.event === 'capture_started') {
     capturing = true
     drawingEnabled = false
@@ -516,23 +536,30 @@ const handleControlMessage = (msg) => {
 }
 
 const connectWebSocket = () => {
-  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
-  ws = new WebSocket(`${protocol}//${location.host}`)
+  const url = `ws://${location.host}`
+  console.log('WS connecting to', url)
+  ws = new WebSocket(url)
   ws.binaryType = 'blob'
 
   ws.onopen = () => {
+    console.log('WS open')
     connected = true
     reconnectDelay = RECONNECT_MIN
+    container.classList.remove('disconnected')
+    splashInfo.hidden = true
+    showLoader(false)
     setStatus('connected', 'connecting')
-    requestCapture('connect')
   }
 
-  ws.onclose = () => {
+  ws.onclose = (e) => {
+    console.log('WS close', e.code, e.reason)
     connected = false
     capturing = false
     drawing = false
     drawingEnabled = false
     pendingCaptureMeta = null
+    container.classList.add('disconnected')
+    splashInfo.hidden = false
     showBackground(Boolean(sourceImage))
     showLoader(true)
     setStatus('...', 'connecting')
@@ -540,8 +567,8 @@ const connectWebSocket = () => {
     reconnectDelay = Math.min(reconnectDelay * 1.5, RECONNECT_MAX)
   }
 
-  ws.onerror = () => {
-    // onclose will fire after this — no action needed
+  ws.onerror = (e) => {
+    console.warn('WebSocket error', e)
   }
 
   ws.onmessage = async (event) => {
@@ -563,18 +590,27 @@ const connectWebSocket = () => {
 const bindToolbar = () => {
   document.getElementById('btn-load').addEventListener('click', () => requestCapture('capture'))
   document.getElementById('btn-clear').addEventListener('click', clearCanvas)
+  const btnPenOnly = document.getElementById('btn-pen-only')
+  btnPenOnly.addEventListener('click', () => {
+    penOnly = !penOnly
+    btnPenOnly.classList.toggle('is-active', penOnly)
+  })
   document.getElementById('btn-undo').addEventListener('click', undoStroke)
   document.getElementById('btn-screenshot').addEventListener('click', () => {
     wsSend('screenshot')
     flashStatus('saved', 'ready', 1200)
   })
   document.getElementById('btn-fullscreen').addEventListener('click', () => {
-    if (document.fullscreenElement) {
-      document.exitFullscreen()
+    const el = document.documentElement
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document)
     } else {
-      document.documentElement.requestFullscreen()
+      (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el)
     }
   })
+  if (!document.documentElement.requestFullscreen && !document.documentElement.webkitRequestFullscreen) {
+    document.getElementById('btn-fullscreen').hidden = true
+  }
   document.getElementById('btn-end').addEventListener('click', endSession)
 
   document.getElementById('preset-fine').addEventListener('click', () => {
@@ -610,6 +646,7 @@ window.addEventListener('orientationchange', () => {
   setTimeout(resizeCanvases, 100)
 })
 document.addEventListener('fullscreenchange', resizeCanvases)
+document.addEventListener('webkitfullscreenchange', resizeCanvases)
 
 window.addEventListener('load', () => {
   bindToolbar()
